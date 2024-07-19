@@ -1,0 +1,37 @@
+# Vim swap files
+**/*.swp
+**/*.log
+
+# Numpy data files
+**/*.npy
+**/*.npz
+
+# Python caches
+**/__pycache__
+**/.pytest_cache
+
+# Pickle files
+**/notes.txt
+*.tar.gz
+*.pkl
+!**/config/**/*.pkl
+
+# Casadi generated files
+**/*.so
+
+# VSCode/editor config files
+**/*.code-workspace
+**/.vscode
+**/*.flake8
+
+# Jupyter checkpoints
+**/*.ipynb_checkpoints
+
+# Ignore coverage reports
+**/*.coverage
+
+# Ignore virtualenvs
+**/venv/**
+
+# Ignore scratch directory
+temp/**

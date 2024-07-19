@@ -1,0 +1,10 @@
+std_msgs/Header header
+auto_msgs2/FromAutobox fromauto_msg
+---
+std_msgs/Header header
+int64 exit_flag
+float64 total_time
+float64[] t_cmd_s
+float64[] s_cmd_m
+float64[] delta_cmd_rad
+float64[] fx_cmd_kn

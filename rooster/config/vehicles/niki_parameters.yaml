@@ -1,0 +1,56 @@
+vehicle:
+  name: 'Niki'
+
+  # Mass and inertia
+  m_kg: 1868.0
+  iz_kgm2: 3049.0
+
+  # Vehicle geometry
+  a_m: 1.19
+  b_m: 1.44
+  track_f_m: 1.52
+  track_r_m: 1.53
+  h_com_m: 0.55
+  h_rc_f_m: 0.07
+  h_rc_r_m: 0.11
+
+  # Drag properties
+  cd0_n: 218.0
+  cd1_nspm: 0.0
+  cd2_ns2pm2: 0.4243
+
+  # Actuator properties
+  drive_f_frac: 1.0
+  drive_r_frac: 0.0
+  brake_f_frac: 0.70
+  brake_r_frac: 0.30
+
+  p_eng_max_w: 172000.0
+  max_delta_deg: 27.0
+  max_delta_dot_degps: 20.0
+  max_fx_kn: 10.0
+  min_fx_kn: -10.0
+  max_fx_dot_knps: 10.0
+  min_fx_dot_knps: -10.0
+  braking_n_to_bar_front: 0.011 # per caliper
+  braking_n_to_bar_rear: 0.0212 # per caliper
+
+  # Load transfer properties
+  tau_long_weight_transfer_s: 0.10
+  tau_lat_weight_transfer_s: 0.05
+  roll_rate_radpmps2: 0.0078
+  gamma_none: 0.64
+
+  # Miscellaneous
+  tire_radius_m: 0.318
+  J_kgm2: 10.0 # axle inertia
+
+front_tire:
+  c0_alpha_nprad: 120000.0
+  c1_alpha_1prad: 0.0
+  mu_none: 0.85
+
+rear_tire:
+  c0_alpha_nprad: 200000.0
+  c1_alpha_1prad: 0.0
+  mu_none: 0.90
