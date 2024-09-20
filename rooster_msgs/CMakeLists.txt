@@ -19,7 +19,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(auto_msgs2 REQUIRED)
 
 set(msg_files
   "msg/NLPOutput.msg"
@@ -34,7 +33,7 @@ set(srv_files
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
-  DEPENDENCIES std_msgs auto_msgs2
+  DEPENDENCIES std_msgs
 )
 
 if(BUILD_TESTING)

@@ -1,5 +1,4 @@
 std_msgs/Header header
-auto_msgs2/FromAutobox fromauto_msg
 ---
 std_msgs/Header header
 int64 exit_flag
