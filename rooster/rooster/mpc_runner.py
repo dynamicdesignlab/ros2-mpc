@@ -116,6 +116,16 @@ class MPCRunner:
         self.nlp_run.nlp.states.set_init_guess("dpsi_rad", 0.0)
         self.nlp_run.nlp.states.set_init_guess("delta_rad", 0.0)
         self.nlp_run.nlp.states.set_init_guess("fx_kn", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("r_2", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("r_1", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("uy_2", 0.5)
+        self.nlp_run.nlp.past.set_init_guess("uy_1", 0.5)
+        self.nlp_run.nlp.past.set_init_guess("ux_2", ux_guess)
+        self.nlp_run.nlp.past.set_init_guess("ux_1", ux_guess)
+        self.nlp_run.nlp.past.set_init_guess("delta_2", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("delta_1", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("fx_2", 0.0)
+        self.nlp_run.nlp.past.set_init_guess("fx_1", 0.0)
         self.nlp_run.update_init_guess()
 
 
@@ -166,6 +176,20 @@ class MPCRunner:
         init_cond_array = init_cond.to_array()
         self.nlp_run.nlp.params.set_value("init_states", init_cond_array)
 
+        init_past = st._StatesPast(
+            r_2=fromauto_msg.r_2,
+            r_1=fromauto_msg.r_1,
+            uy_2=fromauto_msg.uy_2,
+            uy_1=fromauto_msg.uy_1,
+            ux_2=fromauto_msg.ux_2,
+            ux_1=fromauto_msg.ux_1,
+            delta_2=fromauto_msg.delta_2,
+            delta_1=fromauto_msg.delta_1,
+            fx_2=fromauto_msg.fx_2,
+            fx_1=fromauto_msg.fx_1,
+        )
+        self.nlp_run.nlp.params.set_value("init_past", init_past.to_array())
+        
         # print(init_cond)
 
         return NLPSetup(
@@ -219,6 +243,16 @@ class MPCRunner:
             fx_kn=results["fx_kn"].squeeze(),
             delta_dot_radps=results["delta_dot_radps"].squeeze(),
             fx_dot_knps=results["fx_dot_knps"].squeeze(),
+            r_2=results["r_2"].squeeze(),
+            r_1=results["r_1"].squeeze(),
+            uy_2=results["uy_2"].squeeze(),
+            uy_1=results["uy_1"].squeeze(),
+            ux_2=results["ux_2"].squeeze(),
+            ux_1=results["ux_1"].squeeze(),
+            delta_2=results["delta_2"].squeeze(),
+            delta_1=results["delta_1"].squeeze(),
+            fx_2=results["fx_2"].squeeze(),
+            fx_1=results["fx_1"].squeeze(),
             t_s=nlp_t_horizon,
             solve_time_s=stats.solve_time_ms/1000.0,
             exit_flag=stats.exit_flag,
@@ -258,12 +292,32 @@ class MPCRunnerNode(node.Node):
         start_time = time.perf_counter()
         NLPOutput = self.runner.solve_mpc(fromauto_msg=request.fromauto_msg)
 
+        fx_1 = np.array(NLPOutput.result.fx_1).squeeze()
+        fx_2 = np.array(NLPOutput.result.fx_2).squeeze()
+        delta_1 = np.array(NLPOutput.result.delta_1).squeeze()
+        delta_2 = np.array(NLPOutput.result.delta_2).squeeze()
+        ux_1 = np.array(NLPOutput.result.ux_1).squeeze()
+        ux_2 = np.array(NLPOutput.result.ux_2).squeeze()
+        uy_1 = np.array(NLPOutput.result.uy_1).squeeze()
+        uy_2 = np.array(NLPOutput.result.uy_2).squeeze()
+        r_1 = np.array(NLPOutput.result.r_1).squeeze()
+        r_2 = np.array(NLPOutput.result.r_2).squeeze()
         delta_rad = np.array(NLPOutput.result.delta_rad).squeeze()
         fx_kn = np.array(NLPOutput.result.fx_kn).squeeze()
 
         response.t_cmd_s = NLPOutput.result.t_s
         response.s_cmd_m = NLPOutput.result.s_m
         response.exit_flag = NLPOutput.result.exit_flag
+        response.fx_1 = fx_1.tolist()
+        response.fx_2 = fx_2.tolist()
+        response.delta_1 = delta_1.tolist()
+        response.delta_2 = delta_2.tolist()
+        response.ux_1 = ux_1.tolist()
+        response.ux_2 = ux_2.tolist()
+        response.uy_1 = uy_1.tolist()
+        response.uy_2 = uy_2.tolist()
+        response.r_1 = r_1.tolist()
+        response.r_2 = r_2.tolist()
         response.delta_cmd_rad = delta_rad.tolist()
         response.fx_cmd_kn = fx_kn.tolist()
 

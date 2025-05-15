@@ -122,8 +122,8 @@ class MPCFormulation:
     step_size: ClassVar[float] = STEP_SIZE
 
 
-    @cb.casadi_method((MPCStates.num_fields, MPCInputs.num_fields))
-    def dynamics_with_kappa(self, states_vec, inputs_vec) -> types.CASADI_SYMBOLIC:
+    @cb.casadi_method((MPCStates.num_fields, MPCInputs.num_fields, st._StatesPast.num_fields))
+    def dynamics_with_kappa(self, states_vec, inputs_vec, past_vec) -> types.CASADI_SYMBOLIC:
         """
         Vehicle dynamics function wrapper.
         """
@@ -169,7 +169,7 @@ class MPCFormulation:
         track_curvature_st_vec = track_curvature_st.to_array()
 
         dstates_st_vec = self.model.temporal_path_dynamics(
-            states_st_vec, inputs_st_vec, track_curvature_st_vec,
+            states_st_vec, inputs_st_vec, track_curvature_st_vec, past_vec,
         )
 
         dstates_st = st._StatesPath.from_array(dstates_st_vec)

@@ -96,10 +96,11 @@ def print_info() -> None:
 def main():
     print_info()
     veh_integ = integ.create_integrator(
-        integrator=integ.trapz,
+        integrator=integ.euler,
         oracle=config.MPC_PROBLEM.dynamics_with_kappa,
         num_states=mpc.MPCStates.num_fields,
         num_inputs=mpc.MPCInputs.num_fields,
+        num_past=st._StatesPast.num_fields,
     )
 
     horizon = nlp.constant_horizon(num_stages=config.MPC_PROBLEM.num_stages, step_size=config.MPC_PROBLEM.step_size)
@@ -107,6 +108,7 @@ def main():
     nlp_in = nlp.create_nlp_with_dynamics(
         state_names=mpc.MPCStates.field_names,
         input_names=mpc.MPCInputs.field_names,
+        past_names=st._StatesPast.field_names,
         dynamics=veh_integ,
         horizon=horizon,
     )

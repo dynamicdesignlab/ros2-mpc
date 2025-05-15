@@ -18,6 +18,18 @@ float64[] fx_kn
 float64[] delta_dot_radps
 float64[] fx_dot_knps
 
+# MPC Past
+float64[] r_2
+float64[] r_1
+float64[] uy_2
+float64[] uy_1
+float64[] ux_2
+float64[] ux_1
+float64[] delta_2
+float64[] delta_1
+float64[] fx_2
+float64[] fx_1
+
 # MPC Misc
 float64[] t_s
 

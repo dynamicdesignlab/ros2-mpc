@@ -50,6 +50,18 @@ _INPUT_PARAM_NAMES = [
     "fx_kn",
 ]
 
+_PAST_PARAM_NAMES = [
+    "r_2",
+    "r_1",
+    "uy_2",
+    "uy_1",
+    "ux_2",
+    "ux_1",
+    "delta_2",
+    "delta_1",
+    "fx_2",
+    "fx_1",
+]
 
 class EndOfSim(Exception):
     pass
@@ -63,6 +75,7 @@ class SimulatorNode(node.Node):
         self.sim = None
         self.curr_states = None
         self.curr_inputs = None
+        self.curr_past = None
    
         self.fromauto_pub = self.create_publisher(
             msg_type=FromAutobox,
@@ -70,10 +83,11 @@ class SimulatorNode(node.Node):
             qos_profile=_RELIABLE_PUBSUB_QOS,
         )   
 
-    def init_simulation(self, simulator: sim.SimRunner, init_inputs: st._Inputs) -> None:
+    def init_simulation(self, simulator: sim.SimRunner, init_inputs: st._Inputs, init_past: st._StatesPast) -> None:
         self.sim = simulator
         self.curr_states = self.sim.begin()
         self.curr_inputs = init_inputs
+        self.curr_past = init_past
         self.fromauto_pub.publish(self.pack_fromautobox())
 
         self.toauto_sub = self.create_subscription(
@@ -102,6 +116,12 @@ class SimulatorNode(node.Node):
                 (name, parameter.Parameter.Type.DOUBLE) for name in _STATE_PARAM_NAMES
             ],
         )
+        self.declare_parameters(
+            namespace="init_past",
+            parameters=[
+                (name, parameter.Parameter.Type.DOUBLE) for name in _PAST_PARAM_NAMES
+            ],
+        )
         self.declare_parameter(
             name="sim_time_s",
             descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE),
@@ -122,6 +142,11 @@ class SimulatorNode(node.Node):
             for key, value in self.get_parameters_by_prefix("init_states").items()
         }
 
+        past_params = {
+            key: self.extract_float_from_param(value)
+            for key, value in self.get_parameters_by_prefix("init_past").items()
+        }
+
         sim_time_s = self.get_parameter("sim_time_s").get_parameter_value().double_value
         self.enable_mpc_bool = (
             self.get_parameter("enable_mpc_bool").get_parameter_value().double_value
@@ -138,7 +163,20 @@ class SimulatorNode(node.Node):
             dpsi_rad=state_params["dpsi_rad"],
         )
 
-        return init_states, init_inputs, sim_time_s
+        init_past = st._StatesPast(
+            r_2 = past_params["r_2"],
+            r_1 = past_params["r_1"],
+            uy_2 = past_params["uy_2"],
+            uy_1 = past_params["uy_1"],
+            ux_2 = past_params["ux_2"],
+            ux_1 = past_params["ux_1"],
+            delta_2 = past_params["delta_2"],
+            delta_1 = past_params["delta_1"],
+            fx_2 = past_params["fx_2"],
+            fx_1 = past_params["fx_1"],
+        )
+
+        return init_states, init_inputs, init_past, sim_time_s
 
 
     def pack_fromautobox(self) -> FromAutobox:
@@ -162,11 +200,33 @@ class SimulatorNode(node.Node):
             dpsi_rad=self.curr_states.dpsi_rad,
             delta_cmd_rad=self.curr_inputs.delta_rad,
             fx_cmd_kn=self.curr_inputs.fx_kn,
+            r_2=self.curr_past.r_2,
+            r_1=self.curr_past.r_1,
+            uy_2=self.curr_past.uy_2,
+            uy_1=self.curr_past.uy_1,
+            ux_2=self.curr_past.ux_2,
+            ux_1=self.curr_past.ux_1,
+            delta_2=self.curr_past.delta_2,
+            delta_1=self.curr_past.delta_1,
+            fx_2=self.curr_past.fx_2,
+            fx_1=self.curr_past.fx_1,
         )
 
     def timer_callback(self) -> None:
         try:
-            self.curr_states = self.sim.take_step(inputs=self.curr_inputs, params=0.0)
+            r_2_new = self.curr_past.r_1
+            r_1_new = self.curr_states.r_radps
+            uy_2_new = self.curr_past.uy_1
+            uy_1_new = self.curr_states.uy_mps
+            ux_2_new = self.curr_past.ux_1
+            ux_1_new = self.curr_states.ux_mps
+            self.curr_states = self.sim.take_step(inputs=self.curr_inputs, past=self.curr_past, params=0.0)
+            self.curr_past.r_2 = r_2_new
+            self.curr_past.r_1 = r_1_new
+            self.curr_past.uy_2 = uy_2_new
+            self.curr_past.uy_1 = uy_1_new
+            self.curr_past.ux_2 = ux_2_new
+            self.curr_past.ux_1 = ux_1_new
         except StopIteration as err:
             raise EndOfSim from err
         else:
@@ -174,8 +234,17 @@ class SimulatorNode(node.Node):
             
 
     def to_autobox_callback(self, msg: ToAutobox) -> None:
+        delta_2_new = self.curr_past.delta_1
+        delta_1_new = self.curr_inputs.delta_rad
         self.curr_inputs.delta_rad = msg.delta_cmd_rad
+        self.curr_past.delta_2 = delta_2_new
+        self.curr_past.delta_1 = delta_1_new
+
+        fx_2_new = self.curr_past.fx_1
+        fx_1_new = self.curr_inputs.fx_kn
         self.curr_inputs.fx_kn = msg.fx_cmd_kn
+        self.curr_past.fx_2 = fx_2_new
+        self.curr_past.fx_1 = fx_1_new
 
     @staticmethod
     def extract_float_from_param(param: parameter.Parameter) -> float:
@@ -193,12 +262,12 @@ def main(args=None):
 
     rclpy.init(args=args)
     sim_node = SimulatorNode(model=config.SIM_VEHICLE_MODEL)
-    init_states, init_inputs, sim_time_s = sim_node.get_initial_conditions(
+    init_states, init_inputs, init_past, sim_time_s = sim_node.get_initial_conditions(
         world=config.WORLD
     )
 
-    @cb.casadi_function((st._StatesPath.num_fields, st._Inputs.num_fields))
-    def dynamics_with_track_curvature(states_vec, inputs_vec):
+    @cb.casadi_function((st._StatesPath.num_fields, st._Inputs.num_fields, st._StatesPast.num_fields))
+    def dynamics_with_track_curvature(states_vec, inputs_vec, past_vec):
 
         states = st._StatesPath.from_array(states_vec)
 
@@ -220,7 +289,7 @@ def main(args=None):
 
         track_curvature_vec = track_curvature.to_array()
 
-        return config.SIM_VEHICLE_MODEL.temporal_path_dynamics(states_vec, inputs_vec, track_curvature_vec)
+        return config.SIM_VEHICLE_MODEL.temporal_path_dynamics(states_vec, inputs_vec, track_curvature_vec, past_vec)
 
 
     integrator = integrators.create_integrator(
@@ -228,6 +297,7 @@ def main(args=None):
         oracle=dynamics_with_track_curvature,
         num_states=st._StatesPath.num_fields,
         num_inputs=st._Inputs.num_fields,
+        num_past = st._StatesPast.num_fields,
     )
     simulator = sim.SimRunner.create_sim(
         integrator=integrator,
@@ -236,7 +306,7 @@ def main(args=None):
         init_states=init_states,
     )
 
-    sim_node.init_simulation(simulator=simulator, init_inputs=init_inputs)
+    sim_node.init_simulation(simulator=simulator, init_inputs=init_inputs, init_past=init_past)
 
     try:
         rclpy.spin(node=sim_node)
