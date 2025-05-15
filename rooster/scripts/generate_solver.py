@@ -5,7 +5,8 @@ import numpy as np
 from casadi_tools.dynamics import integrators as integ
 from casadi_tools.dynamics import projector as proj
 from casadi_tools.nlp_utils import nlp_problem as nlp
-from models import single_track as st
+from models import nn_dynamics as st
+#from models import single_track as st
 from models import vehicle_params as vp
 from casadi_tools.nlp_utils import casadi_builder as cb
 

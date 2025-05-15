@@ -8,12 +8,13 @@ import numpy as np
 from casadi_tools import types
 from casadi_tools.dynamics import named_arrays as na
 from casadi_tools.nlp_utils import casadi_builder as cb
-from models import single_track as st
+from models import nn_dynamics as st
+#from models import single_track as st
 from models import world as wd
 from python_data_parsers import units
 from python_data_parsers.units import SI_PREFIX
 
-NUM_STAGES = 60
+NUM_STAGES = 40
 STEP_SIZE  = 0.05 # seconds
 
 @dataclass
@@ -94,11 +95,28 @@ class MPCFormulation:
     """
 
     model: st.Model
-    """Dynamic model."""
+    """Dynamic model"""
     interp_ux: Callable
-    """Interpolant for desired longitudinal speed in terms of path progress [m/s]."""
+    """Interpolant for desired longitudinal speed"""
+    interp_e: Callable
+    """Interpolant for desired lateral position"""
+    interp_dpsi: Callable
+    """Interpolant for desired relative heading"""
+
+
+    interp_psi: Callable
+    """Interpolant for road heading angle"""
+    interp_phi: Callable
+    """Interpolant for road grade angle"""
+    interp_theta: Callable
+    """Interpolant for road bank angle"""
+
     interp_k_psi: Callable
-    """Interpolant for the centerline curvature in terms of path progress [1/m]."""
+    """Interpolant for the centerline curvature"""
+    interp_k_phi: Callable
+    """Interpolant for road grade angle curvature"""
+    interp_k_theta: Callable
+    """Interpolant for vertical curvature"""
     
     num_stages: ClassVar[int] = NUM_STAGES
     step_size: ClassVar[float] = STEP_SIZE
@@ -113,7 +131,13 @@ class MPCFormulation:
         states = MPCStates.from_array(states_vec)
         inputs = MPCInputs.from_array(inputs_vec)
 
-        k_psi_1pm = self.interp_k_psi(states.s_m)
+        
+        psi_cl_rad = self.interp_psi(states.s_m)
+        theta_cl_rad = self.interp_theta(states.s_m)
+        phi_cl_rad = self.interp_phi(states.s_m)
+        k_psi_cl_radpm = self.interp_k_psi(states.s_m)
+        k_theta_cl_radpm = self.interp_k_theta(states.s_m)
+        k_phi_cl_radpm = self.interp_k_phi(states.s_m)
 
         states_st = st._StatesPath(
             ux_mps=states.ux_mps,
@@ -131,11 +155,21 @@ class MPCFormulation:
             fx_kn=states.fx_kn,
         )
 
+        track_curvature_st = st._TrackCurvature(
+            psi_cl_rad=psi_cl_rad,
+            theta_cl_rad=theta_cl_rad,
+            phi_cl_rad=phi_cl_rad,
+            k_psi_cl_radpm=k_psi_cl_radpm,
+            k_theta_cl_radpm=k_theta_cl_radpm,
+            k_phi_cl_radpm=k_phi_cl_radpm,
+        )
+
         states_st_vec = states_st.to_array()
         inputs_st_vec = inputs_st.to_array()
+        track_curvature_st_vec = track_curvature_st.to_array()
 
         dstates_st_vec = self.model.temporal_path_dynamics(
-            states_st_vec, inputs_st_vec, k_psi_1pm,
+            states_st_vec, inputs_st_vec, track_curvature_st_vec,
         )
 
         dstates_st = st._StatesPath.from_array(dstates_st_vec)
@@ -171,13 +205,17 @@ class MPCFormulation:
         stage_params = StageObjParams.from_array(stage_params_vec)
 
 
-        ux_des_mps = self.interp_ux(states.s_m)
+        ux_ref_mps = self.interp_ux(states.s_m)
+        e_ref_m = self.interp_e(states.s_m)
+        dpsi_ref_rad = self.interp_dpsi(states.s_m)
 
-        delta_ux = states.ux_mps - ux_des_mps
+        delta_ux = states.ux_mps - ux_ref_mps
+        delta_e = states.e_m - e_ref_m
+        delta_dpsi = states.dpsi_rad - dpsi_ref_rad
+
         J_ux = stage_params.w_ux * (delta_ux**2)
-
-        J_e  = stage_params.w_e * (states.e_m**2)
-        J_dpsi = stage_params.w_dpsi * (states.dpsi_rad**2)
+        J_e  = stage_params.w_e * (delta_e**2)
+        J_dpsi = stage_params.w_dpsi * (delta_dpsi**2)
 
         J_delta_dot = stage_params.w_delta_dot * (inputs.delta_dot_radps**2)
         J_fx_dot = stage_params.w_fx_dot * (inputs.fx_dot_knps**2)
@@ -215,11 +253,13 @@ class MPCFormulation:
         states = MPCStates.from_array(states_vec)
         terminal_params = TerminalObjParams.from_array(terminal_params_vec)
 
-        ux_des_mps = self.interp_ux(states.s_m)
+        ux_ref_mps = self.interp_ux(states.s_m)
+        e_ref_m = self.interp_e(states.s_m)
+        dpsi_ref_rad = self.interp_dpsi(states.s_m) 
 
-        J_ux_term = terminal_params.w_terminal_ux * (states.ux_mps - ux_des_mps) ** 2
-        J_e_term = terminal_params.w_terminal_e * states.e_m**2
-        J_dpsi_term = terminal_params.w_terminal_dpsi * states.dpsi_rad**2
+        J_ux_term = terminal_params.w_terminal_ux * (states.ux_mps - ux_ref_mps) ** 2
+        J_e_term = terminal_params.w_terminal_e * (states.e_m - e_ref_m)**2
+        J_dpsi_term = terminal_params.w_terminal_dpsi * (states.dpsi_rad - dpsi_ref_rad)**2
 
         J_item = TerminalObjResult(
             J_terminal_ux=J_ux_term,

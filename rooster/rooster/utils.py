@@ -1,7 +1,8 @@
 from typing import Tuple
 
 from auto_msgs2.msg import FromAutobox
-from models import single_track as st
+from models import nn_dynamics as st
+#from models import single_track as st
 
 
 def get_states_inputs_from_fromautobox(
@@ -22,8 +23,8 @@ def get_states_inputs_from_fromautobox(
         psi_rad=fromauto_msg.psi_rad,
     )
     out_input = st._Inputs(
-        delta_rad=fromauto_msg.delta_meas_rad,
-        fx_kn=fromauto_msg.fx_meas_kn,
+        delta_rad=fromauto_msg.delta_est_rad,
+        fx_kn=fromauto_msg.fx_est_kn,
     )
 
     return out_state, out_input

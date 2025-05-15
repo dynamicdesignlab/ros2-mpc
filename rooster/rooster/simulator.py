@@ -5,11 +5,14 @@ import numpy as np
 from auto_msgs2.msg import FromAutobox, ToAutobox
 from casadi_tools.dynamics import integrators
 from casadi_tools.simulation import simulator as sim
-from models import single_track as st
+from models import nn_dynamics as st
+#from models import single_track as st
 from models import world as wd
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from rclpy import node, parameter, qos
 from casadi_tools.nlp_utils import casadi_builder as cb
+from casadi_tools import types
+from typing import Callable, ClassVar
 
 from rooster import config, interpolation
 
@@ -29,18 +32,18 @@ _BESTEFFORT_PUBSUB_QOS = qos.QoSProfile(
 )
 
 """
-Note: In this simulation, the vehicle's motion is propagated in the global frame (East/North/Psi)
+Note: In this simulation, the vehicle's motion is propagated in the path-relative frame (s/e/b/dpsi)
 """
 
 _STATE_PARAM_NAMES = [
     "ux_mps",
     "uy_mps",
     "r_radps",
-    "east_m",
-    "north_m",
-    "psi_rad",
     "dfz_long_kn",
     "dfz_lat_kn",
+    "s_m",
+    "e_m",
+    "dpsi_rad",
 ]
 _INPUT_PARAM_NAMES = [
     "delta_rad",
@@ -65,7 +68,7 @@ class SimulatorNode(node.Node):
             msg_type=FromAutobox,
             topic="/simulator/from_autobox",
             qos_profile=_RELIABLE_PUBSUB_QOS,
-        )
+        )   
 
     def init_simulation(self, simulator: sim.SimRunner, init_inputs: st._Inputs) -> None:
         self.sim = simulator
@@ -85,7 +88,8 @@ class SimulatorNode(node.Node):
 
     def get_initial_conditions(
         self, world: wd.SimpleWorld,
-    ) -> tuple[st._StatesGlobal, st._Inputs, float]:
+    ) -> tuple[st._StatesPath, st._Inputs, float]:
+        
         self.declare_parameters(
             namespace="init_inputs",
             parameters=[
@@ -123,22 +127,24 @@ class SimulatorNode(node.Node):
             self.get_parameter("enable_mpc_bool").get_parameter_value().double_value
         )
 
-        init_states = st._StatesGlobal(
+        init_states = st._StatesPath(
             ux_mps=state_params["ux_mps"],
             uy_mps=state_params["uy_mps"],
             r_radps=state_params["r_radps"],
             dfz_long_kn=0.1,
             dfz_lat_kn=0.1,
-            east_m=state_params["east_m"],
-            north_m=state_params["north_m"],
-            psi_rad=state_params["psi_rad"],
+            s_m=state_params["s_m"],
+            e_m=state_params["e_m"],
+            dpsi_rad=state_params["dpsi_rad"],
         )
 
         return init_states, init_inputs, sim_time_s
 
 
     def pack_fromautobox(self) -> FromAutobox:
-        
+
+        east_m, north_m, _, psi_rad = config.WORLD.sebdpsi_to_enupsi(s_m=self.curr_states.s_m, e_m=self.curr_states.e_m, b_m=0.0, dpsi_rad=self.curr_states.dpsi_rad,)
+
         return FromAutobox(
             heartbeat=self.sim.current_event,
             t_s=self.sim.current_time,
@@ -148,20 +154,14 @@ class SimulatorNode(node.Node):
             r_radps=self.curr_states.r_radps,
             dfz_long_est_kn=self.curr_states.dfz_long_kn,
             dfz_lat_est_kn=self.curr_states.dfz_lat_kn,
-            east_m=self.curr_states.east_m,
-            north_m=self.curr_states.north_m,
-            psi_rad=self.curr_states.psi_rad,
-            s_m=-1717.0,
-            e_m=-1717.0,
-            dpsi_rad=-1717.0,
+            east_m=east_m,
+            north_m=north_m,
+            psi_rad=psi_rad,
+            s_m=self.curr_states.s_m,
+            e_m=self.curr_states.e_m,
+            dpsi_rad=self.curr_states.dpsi_rad,
             delta_cmd_rad=self.curr_inputs.delta_rad,
-            delta_meas_rad=0.0,
             fx_cmd_kn=self.curr_inputs.fx_kn,
-            fx_meas_kn=0.0,
-            user_def0=self.enable_mpc_bool,
-            user_def1=0.0,
-            user_def2=0.0,
-            user_def3=0.0,
         )
 
     def timer_callback(self) -> None:
@@ -180,6 +180,7 @@ class SimulatorNode(node.Node):
     @staticmethod
     def extract_float_from_param(param: parameter.Parameter) -> float:
         return param.get_parameter_value().double_value
+    
 
 
 
@@ -196,10 +197,36 @@ def main(args=None):
         world=config.WORLD
     )
 
+    @cb.casadi_function((st._StatesPath.num_fields, st._Inputs.num_fields))
+    def dynamics_with_track_curvature(states_vec, inputs_vec):
+
+        states = st._StatesPath.from_array(states_vec)
+
+        psi_cl_rad       = config.MPC_PROBLEM.interp_psi(states.s_m)
+        theta_cl_rad     = config.MPC_PROBLEM.interp_theta(states.s_m)
+        phi_cl_rad       = config.MPC_PROBLEM.interp_phi(states.s_m)
+        k_psi_cl_radpm   = config.MPC_PROBLEM.interp_k_psi(states.s_m)
+        k_theta_cl_radpm = config.MPC_PROBLEM.interp_k_theta(states.s_m)
+        k_phi_cl_radpm   = config.MPC_PROBLEM.interp_k_phi(states.s_m)
+
+        track_curvature = st._TrackCurvature(
+            psi_cl_rad=psi_cl_rad,
+            theta_cl_rad=theta_cl_rad,
+            phi_cl_rad=phi_cl_rad,
+            k_psi_cl_radpm=k_psi_cl_radpm,
+            k_theta_cl_radpm=k_theta_cl_radpm,
+            k_phi_cl_radpm=k_phi_cl_radpm,
+        )
+
+        track_curvature_vec = track_curvature.to_array()
+
+        return config.SIM_VEHICLE_MODEL.temporal_path_dynamics(states_vec, inputs_vec, track_curvature_vec)
+
+
     integrator = integrators.create_integrator(
         integrator=integrators.euler,
-        oracle=config.SIM_VEHICLE_MODEL.temporal_global_dynamics,
-        num_states=st._StatesGlobal.num_fields,
+        oracle=dynamics_with_track_curvature,
+        num_states=st._StatesPath.num_fields,
         num_inputs=st._Inputs.num_fields,
     )
     simulator = sim.SimRunner.create_sim(

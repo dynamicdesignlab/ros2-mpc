@@ -7,7 +7,8 @@ import rclpy
 from auto_msgs2.msg import FromAutobox
 from casadi_tools.dynamics import named_arrays as na
 from casadi_tools.nlp_utils import nlp_runner
-from models import single_track as st
+from models import nn_dynamics as st
+#from models import single_track as st
 from rclpy import node, qos
 from rooster_msgs.msg import NLPOutput, NLPResult, NLPSetup
 from rooster_msgs.srv import NLPService
