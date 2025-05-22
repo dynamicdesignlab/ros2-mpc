@@ -46,9 +46,10 @@ def parse_mpc_data(
 
     s_vec = mpc_data["s_m"].reshape(-1, 1)
     e_vec = mpc_data["e_m"].reshape(-1, 1)
+    b_vec = np.zeros_like(s_vec)
     dpsi_vec = mpc_data["dpsi_rad"].reshape(-1, 1)
 
-    east_m, north_m, psi_rad = world.seu_to_enu(s_vec, e_vec, dpsi_vec)
+    east_m, north_m, up_m, psi_rad = world.sebdpsi_to_enupsi(s_vec, e_vec, b_vec, dpsi_vec)
 
     mpc_data["east_m"] = east_m.reshape((num_epoch, num_stage))
     mpc_data["north_m"] = north_m.reshape((num_epoch, num_stage))

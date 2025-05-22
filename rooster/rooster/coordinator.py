@@ -69,9 +69,9 @@ class Coordinator:
         self._num_fromauto_rcv += 1
         states, _ = utils.get_states_inputs_from_fromautobox(msg)
 
-        # Update the map matched s, e, and dpsi based off the most recent East/North/Psi measurement
-        msg.s_m, msg.e_m, msg.dpsi_rad = self.world.enu_to_seu(
-            east_m=states.east_m, north_m=states.north_m, psi_rad=states.psi_rad
+        # Update the map matched s, e, and dpsi based off the most recent East/North/Up/Psi measurement
+        msg.s_m, msg.e_m, _, msg.dpsi_rad = self.world.enupsi_to_sebdpsi(
+            east_m=states.east_m, north_m=states.north_m, up_m=0.0, psi_rad=states.psi_rad
         )
 
         # Logic for determining when we update our motion plan, stored in self._nlp_result
@@ -116,10 +116,6 @@ class Coordinator:
             fx_cmd_kn=fx_cmd_kn,
             solver_exit_flag=self._last_exit_flag,
             solver_solve_time_s=self._last_solve_duration_s,
-            user_def0=0.0,
-            user_def1=0.0,
-            user_def2=0.0,
-            user_def3=0.0,
         )
 
     def _interpolate_inputs_s(self, s_m: float) -> Tuple[float, float, float]:

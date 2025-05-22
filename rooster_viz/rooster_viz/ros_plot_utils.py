@@ -35,6 +35,9 @@ def extract_from_data(
     from_data = ros_data["/auto_bridge2/from_autobox"]
     from_data["psi_rad"] = wrap_to_pi_float(from_data["psi_rad"])
 
+    # Add map-matched coordinates
+    
+
     return from_data
 
 
