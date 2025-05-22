@@ -48,9 +48,9 @@ vehicle:
 front_tire:
   c0_alpha_nprad: 120000.0
   c1_alpha_1prad: 0.0
-  mu_none: 0.85
+  mu_none: 0.95
 
 rear_tire:
-  c0_alpha_nprad: 200000.0
+  c0_alpha_nprad: 160000.0
   c1_alpha_1prad: 0.0
-  mu_none: 0.90
+  mu_none: 1.00

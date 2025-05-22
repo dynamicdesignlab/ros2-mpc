@@ -30,7 +30,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "ux_mps": 2.5,
+                "ux_mps": 20.0,
                 "uy_mps": 0.0,
                 "r_radps": 0.0,
                 "dfz_long_kn": 0.0,
@@ -39,9 +39,17 @@ def generate_launch_description():
                 "fx_kn": 0.0,
                 "sim_time_s": 600.0,
                 "enable_mpc_bool": 1.0,
-                "east_m": -292.2,
-                "north_m": -408.2,
-                "psi_rad": -3.1,
+                # "east_m": -292.2,
+                # "north_m": -408.2,
+                # "psi_rad": -3.1,
+                # "east_m": -879.0,
+                # "north_m": -657.0,
+                # "psi_rad": -3.0,
+
+                # Portimao starting line
+                "east_m": 23.46,
+                "north_m": -50.92,
+                "psi_rad": 0.26,
             }
         ],
         remappings=[
